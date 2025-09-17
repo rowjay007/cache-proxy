@@ -1,0 +1,162 @@
+version: "3"
+
+vars:
+  BINARY_NAME: "caching-proxy"
+  MAIN_PATH: "./cmd/caching-proxy"
+  BUILD_DIR: "./bin"
+  COVERAGE_DIR: "./coverage"
+
+tasks:
+  default:
+    desc: "Show available tasks"
+    cmds:
+      - "task --list"
+
+  build:
+    desc: "Build the application"
+    cmds:
+      - "mkdir -p {{.BUILD_DIR}}"
+      - "go build -o {{.BUILD_DIR}}/{{.BINARY_NAME}} {{.MAIN_PATH}}"
+    sources:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+    generates:
+      - "{{.BUILD_DIR}}/{{.BINARY_NAME}}"
+
+  build-linux:
+    desc: "Build for Linux"
+    cmds:
+      - "mkdir -p {{.BUILD_DIR}}"
+      - "GOOS=linux GOARCH=amd64 go build -o {{.BUILD_DIR}}/{{.BINARY_NAME}}-linux {{.MAIN_PATH}}"
+
+  build-windows:
+    desc: "Build for Windows"
+    cmds:
+      - "mkdir -p {{.BUILD_DIR}}"
+      - "GOOS=windows GOARCH=amd64 go build -o {{.BUILD_DIR}}/{{.BINARY_NAME}}.exe {{.MAIN_PATH}}"
+
+  build-all:
+    desc: "Build for all platforms"
+    deps:
+      - "build"
+      - "build-linux"
+      - "build-windows"
+
+  run:
+    desc: "Run the application (requires --port and --origin flags)"
+    cmds:
+      - "go run {{.MAIN_PATH}} {{.CLI_ARGS}}"
+
+  run-dev:
+    desc: "Run with development settings"
+    cmds:
+      - "go run {{.MAIN_PATH}} --port 3000 --origin http://dummyjson.com"
+
+  test:
+    desc: "Run all tests"
+    cmds:
+      - "go test -v ./..."
+
+  test-coverage:
+    desc: "Run tests with coverage"
+    cmds:
+      - "mkdir -p {{.COVERAGE_DIR}}"
+      - "go test -v -coverprofile={{.COVERAGE_DIR}}/coverage.out ./..."
+      - "go tool cover -html={{.COVERAGE_DIR}}/coverage.out -o {{.COVERAGE_DIR}}/coverage.html"
+
+  test-race:
+    desc: "Run tests with race detection"
+    cmds:
+      - "go test -race -v ./..."
+
+  benchmark:
+    desc: "Run benchmarks"
+    cmds:
+      - "go test -bench=. -benchmem ./..."
+
+  lint:
+    desc: "Run linting"
+    cmds:
+      - "go vet ./..."
+      - "go fmt ./..."
+
+  lint-check:
+    desc: "Check formatting and vet"
+    cmds:
+      - 'test -z "$(go fmt ./...)"'
+      - "go vet ./..."
+
+  deps:
+    desc: "Download and tidy dependencies"
+    cmds:
+      - "go mod download"
+      - "go mod tidy"
+
+  deps-update:
+    desc: "Update all dependencies"
+    cmds:
+      - "go get -u ./..."
+      - "go mod tidy"
+
+  clean:
+    desc: "Clean build artifacts"
+    cmds:
+      - "rm -rf {{.BUILD_DIR}}"
+      - "rm -rf {{.COVERAGE_DIR}}"
+      - "go clean"
+
+  install:
+    desc: "Install the binary to $GOPATH/bin"
+    cmds:
+      - "go install {{.MAIN_PATH}}"
+
+  docker-build:
+    desc: "Build Docker image"
+    cmds:
+      - "docker build -t {{.BINARY_NAME}} ."
+
+  dev:
+    desc: "Development server with hot reload (requires air)"
+    cmds:
+      - "air -c .air.toml"
+
+  help:
+    desc: "Show help for CLI usage"
+    cmds:
+      - "go run {{.MAIN_PATH}} --help"
+
+  clear-cache:
+    desc: "Clear application cache"
+    cmds:
+      - "go run {{.MAIN_PATH}} --clear-cache"
+
+  ci:
+    desc: "Run CI pipeline (lint, test, build)"
+    deps:
+      - "lint-check"
+      - "test-race"
+      - "build"
+
+  release:
+    desc: "Build release artifacts"
+    deps:
+      - "clean"
+      - "lint-check"
+      - "test"
+      - "build-all"
+
+  mod-graph:
+    desc: "Show module dependency graph"
+    cmds:
+      - "go mod graph"
+
+  mod-why:
+    desc: "Show why a module is needed (usage: task mod-why -- <module>)"
+    cmds:
+      - "go mod why {{.CLI_ARGS}}"
+
+  security:
+    desc: "Run security checks (requires govulncheck)"
+    cmds:
+      - "govulncheck ./..."
